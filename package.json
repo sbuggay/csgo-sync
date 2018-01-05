@@ -9,12 +9,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "commander": "^2.12.2",
     "inquirer": "^4.0.2",
     "request": "^2.83.0"
   },
   "devDependencies": {
-    "@types/core-js": "^0.9.44",
     "@types/inquirer": "0.0.36",
     "@types/node": "^4.0.35",
     "@types/request": "^2.0.9"
