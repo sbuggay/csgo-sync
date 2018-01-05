@@ -1,13 +1,14 @@
-import * as inquirer from "inquirer";
+
 import * as request from "request";
 import * as fs from "fs";
+
+import * as inquirer from "inquirer";
 
 import { join } from "path";
 
 const APP_ID = 730;
 const API_KEY = "1578879989BD74A6D189050250810E86";
-
-const bit: number = 61197960265728;
+const BIT_SHIFT: number = 61197960265728;
 
 /**
  * Utility function to convert 32bit steamids to 64bit
@@ -16,7 +17,7 @@ const bit: number = 61197960265728;
  * @returns 
  */
 function convertTo64BitId(id: string): string {
-    return `765${Number(id) + bit}`;
+    return `765${Number(id) + BIT_SHIFT}`;
 }
 
 const userDataPath = "C:/Program Files (x86)/Steam/userdata";
@@ -26,7 +27,6 @@ const configFiles = [
     "autoexec.cfg",
     "video.txt"
 ];
-
 
 /**
  * Get player summaries using steam api
@@ -89,7 +89,7 @@ function copyFile(source: string, destination: string): void {
 }
 
 function main() {
-    const configDirs = getDirectories(userDataPath);
+    let configDirs = getDirectories(userDataPath);
 
     const files: any = {};
     const playerSummaries: any = {};
@@ -100,8 +100,7 @@ function main() {
         });
 
         const choices: string[] = [];
-
-        configDirs.map(value => {
+        configDirs = configDirs.map(value => {
             files[value] = getConfigFiles(join(userDataPath, value, cfgRelativePath)).map(name => join(userDataPath, value, cfgRelativePath));
             if (playerSummaries[convertTo64BitId(value)]) {
                 choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
@@ -109,8 +108,8 @@ function main() {
             else {
                 choices.push(value);
             }
+            return join(userDataPath, value, cfgRelativePath);
         });
-
         inquirer.prompt([{
             type: "list",
             name: "source",
@@ -127,17 +126,27 @@ function main() {
     });
 }
 
+const choices: inquirer.ChoiceType[] = [
+    {
+        name: "copy",
+        value: "copy"
+    },
+    {
+        name: "copy",
+        value: "copy"
+    },
+    {
+        name: "copy",
+        value: "copy"
+    },
+]
 
 inquirer.prompt([{
     type: "list",
     name: "source",
     message: "Where are the source configs?",
-    choices: [
-        "copy",
-        "gist",
-        "file"
-    ]
-}]).then(answers => {
+    choices: choices
+}]).then((answers) => {
     main();
 });
 
