@@ -1,15 +1,21 @@
-const inquirer = require("inquirer");
-const request = require("request");
+import * as inquirer from "inquirer";
+import * as request from "request";
+import * as fs from "fs";
 
-const fs = require("fs");
-const { join } = require("path");
+import { join } from "path";
 
 const APP_ID = 730;
 const API_KEY = "1578879989BD74A6D189050250810E86";
 
-const bit = 61197960265728;
+const bit: number = 61197960265728;
 
-function convertTo64BitId(id) {
+/**
+ * Utility function to convert 32bit steamids to 64bit
+ * 
+ * @param {any} id 
+ * @returns 
+ */
+function convertTo64BitId(id: string): string {
     return `765${Number(id) + bit}`;
 }
 
@@ -21,10 +27,18 @@ const configFiles = [
     "video.txt"
 ];
 
-function getPlayerSummaries(ids) {
+
+/**
+ * Get player summaries using steam api
+ * 
+ * @param {any} ids 
+ * @returns 
+ */
+function getPlayerSummaries(ids: string[]): Promise<any[]> {
     return new Promise((resolve, reject) => {
         if (ids && ids.length && ids.length > 0) {
-            return request(`http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`, (error, response, body) => {
+            const url = `http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
+            return request(url, (error, response, body) => {
                 if (error) {
                     throw new Error(error);
                 }
@@ -36,19 +50,37 @@ function getPlayerSummaries(ids) {
         }
     });
 }
-
-function isDirectory(source) {
-    return fs.lstatSync(source).isDirectory();
+/**
+ * Utilty function to determine if path is a directory
+ * 
+ * @param {any} path 
+ * @returns 
+ */
+function isDirectory(path: string): boolean {
+    return fs.lstatSync(path).isDirectory();
 }
 
-function getConfigFiles(source) {
-    return fs.readdirSync(source).filter(name => configFiles.includes(name));
+/**
+ * Gets all files that match the config file mask
+ * 
+ * @param {any} path 
+ * @returns 
+ */
+function getConfigFiles(path: string): string[] {
+    return fs.readdirSync(path).filter(name => configFiles.indexOf(name) !== -1);
 }
 
-function getDirectories(source) {
-    return fs.readdirSync(source).filter(name => isDirectory(join(userDataPath, name)));
+/**
+ * Utility function to get directories of a given path
+ * 
+ * @param {any} path 
+ * @returns 
+ */
+function getDirectories(path: string): string[] {
+    return fs.readdirSync(path).filter(name => isDirectory(join(userDataPath, name)));
 }
-function copyFile(source, destination) {
+
+function copyFile(source: string, destination: string): void {
     const readStream = fs.createReadStream(source);
     const writeStream = fs.createWriteStream(destination);
     if (readStream && writeStream) {
@@ -59,18 +91,18 @@ function copyFile(source, destination) {
 function main() {
     const configDirs = getDirectories(userDataPath);
 
-    const files = {};
-    const playerSummaries = {};
+    const files: any = {};
+    const playerSummaries: any = {};
 
     getPlayerSummaries(configDirs).then(response => {
         response.forEach(summary => {
             playerSummaries[summary.steamid] = summary;
         });
 
-        const choices = [];
+        const choices: string[] = [];
 
-        configDirs.forEach(value => {
-            files[value] = getConfigFiles(join(userDataPath, value, cfgRelativePath)).map(name => join(userDataPath, value, cfgRelativePath, name));
+        configDirs.map(value => {
+            files[value] = getConfigFiles(join(userDataPath, value, cfgRelativePath)).map(name => join(userDataPath, value, cfgRelativePath));
             if (playerSummaries[convertTo64BitId(value)]) {
                 choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
             }
@@ -86,10 +118,11 @@ function main() {
             choices
         }]).then(answers => {
 
-
             const id = answers.source.split(" ")[0];
 
-            console.log(files[id]);
+            configDirs.filter(name => name !== id).forEach(config => {
+                console.log(files[config]);
+            })
         });
     });
 }
@@ -105,7 +138,6 @@ inquirer.prompt([{
         "file"
     ]
 }]).then(answers => {
-    console.log(answers);
     main();
 });
 

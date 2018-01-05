@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "module": "none",
+        "target": "es2015",
+        "noImplicitAny": true,
+        "strict": true,
+        "outDir": "./out",
+        "sourceMap": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/*.spec.ts"
+    ]
+}
