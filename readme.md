@@ -1,4 +1,5 @@
 # csgo-sync
+[![npm version](https://badge.fury.io/js/csgo-sync.svg)](https://badge.fury.io/js/csgo-sync)
 
 This is an application to manage and syncronize your CS:GO configs across multiple computers and accounts.
 
