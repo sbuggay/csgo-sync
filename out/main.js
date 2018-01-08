@@ -1,4 +1,12 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const request = require("request");
 const fs = require("fs");
@@ -6,10 +14,10 @@ const inquirer = require("inquirer");
 const path_1 = require("path");
 // TODO: turn these into command line arguments
 const APP_ID = 730;
-const API_KEY = "1578879989BD74A6D189050250810E86";
+const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
 const BIT_SHIFT = 61197960265728;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
-const OUT_FILE_NAME = "out.json";
+const OUT_FILE_NAME = "config.json";
 const resources = {
     import: "Import from file",
     importweb: "Import from URL",
@@ -47,18 +55,18 @@ const configFiles = [
  * @returns
  */
 function getPlayerSummaries(ids) {
-    return new Promise((resolve, reject) => {
+    return __awaiter(this, void 0, void 0, function* () {
         if (ids && ids.length && ids.length > 0) {
-            const url = `${PLAYER_SUMMARIES_API_URL}/?key=${API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
-            return request(url, (error, response, body) => {
+            const url = `${PLAYER_SUMMARIES_API_URL}/?key=${STEAM_API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
+            request(url, (error, response, body) => {
                 if (error) {
                     throw new Error(error);
                 }
-                resolve(JSON.parse(body).response.players);
+                return JSON.parse(body).response.players;
             });
         }
         else {
-            throw new Error("ids must be an array");
+            return [];
         }
     });
 }
@@ -97,6 +105,7 @@ function importConfig() {
     inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
         const configObject = JSON.parse(fs.readFileSync(answers.path).toString());
         console.log(configObject);
+        // Ask for user confirmation
         confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
             writeConfig(configObject);
             console.log("Configs have been written");
@@ -115,6 +124,7 @@ function importConfigWeb() {
             }
             const configObject = JSON.parse(body);
             console.log(configObject);
+            // Ask for user confirmation
             confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
                 writeConfig(configObject);
                 console.log("Configs have been written");
@@ -127,8 +137,9 @@ function importConfigWeb() {
  *
  */
 function exportConfig() {
-    // Select config directory to export
-    selectConfigDir("Which config would you like to export?").then(result => {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Select config directory to export
+        const result = yield selectConfigDir("Which config would you like to export?");
         const configPath = path_1.join(userDataPath, result, cfgRelativePath);
         const configFiles = getConfigFiles(configPath);
         const exportObject = {};
@@ -138,8 +149,8 @@ function exportConfig() {
             exportObject[filename] = fs.readFileSync(file, "utf8");
         });
         // Write serialized config file out
-        fs.writeFileSync("out.json", JSON.stringify(exportObject, null, 4));
-        // console.log(`Config written to ${join(process.cwd, "out.json")}`);
+        fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
+        console.log(`Config written to ${OUT_FILE_NAME}}`);
     });
 }
 /**
@@ -147,7 +158,9 @@ function exportConfig() {
  *
  */
 function sync() {
-    selectConfigDir("Which config would you like to sync from?").then(result => {
+    return __awaiter(this, void 0, void 0, function* () {
+        // Select a config to syncronize from
+        const result = yield selectConfigDir("Which config would you like to sync from?");
         confirm("Are you sure you want to sync?").then(() => {
             const configPath = path_1.join(userDataPath, result, cfgRelativePath);
             const configFiles = getConfigFiles(configPath);
@@ -196,31 +209,32 @@ function confirm(message) {
  * @returns {Promise<string>}
  */
 function selectConfigDir(message) {
-    return new Promise((resolve, reject) => {
+    return __awaiter(this, void 0, void 0, function* () {
         // Get all the config directories
         let configDirs = getDirectories(userDataPath);
         const files = {};
         const playerSummaries = {};
         // Get player summaries so we can show account name next to steamid
-        getPlayerSummaries(configDirs).then(response => {
+        if (STEAM_API_KEY) {
+            const response = yield getPlayerSummaries(configDirs);
             response.forEach(summary => {
                 playerSummaries[summary.steamid] = summary;
             });
-            const choices = [];
-            // If there is a player summary for this ID, add the account name to the choice
-            configDirs.forEach(value => {
-                if (playerSummaries[convertTo64BitId(value)]) {
-                    choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
-                }
-                else {
-                    choices.push(value);
-                }
-            });
-            // Prompt user for directory
-            inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
-                const id = answers.source.split(" ")[0];
-                resolve(id);
-            });
+        }
+        const choices = [];
+        // If there is a player summary for this ID, add the account name to the choice
+        configDirs.forEach(value => {
+            if (playerSummaries[convertTo64BitId(value)]) {
+                choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
+            }
+            else {
+                choices.push(value);
+            }
+        });
+        // Prompt user for directory
+        return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
+            const id = answers.source.split(" ")[0];
+            return id;
         });
     });
 }
@@ -259,8 +273,10 @@ const choices = [
         value: EApplicationOptions.EXPORT
     },
 ];
+console.log("csgo-sync");
+// Prompt the user for the initial option
 inquirer.prompt([{
-        type: "list", name: "option", message: "Please select one", choices: choices
+        type: "list", name: "option", message: "Please select an option", choices: choices
     }]).then((answers) => {
     main(answers.option);
 });

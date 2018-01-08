@@ -7,10 +7,10 @@ import { join, basename } from "path";
 
 // TODO: turn these into command line arguments
 const APP_ID = 730;
-const API_KEY = "1578879989BD74A6D189050250810E86";
+const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
 const BIT_SHIFT: number = 61197960265728;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
-const OUT_FILE_NAME = "out.json";
+const OUT_FILE_NAME = "config.json";
 
 const resources = {
     import: "Import from file",
@@ -55,21 +55,19 @@ const configFiles = [
  * @param {any} ids 
  * @returns 
  */
-function getPlayerSummaries(ids: string[]): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-        if (ids && ids.length && ids.length > 0) {
-            const url = `${PLAYER_SUMMARIES_API_URL}/?key=${API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
-            return request(url, (error, response, body) => {
-                if (error) {
-                    throw new Error(error);
-                }
-                resolve(JSON.parse(body).response.players);
-            });
-        }
-        else {
-            throw new Error("ids must be an array");
-        }
-    });
+async function getPlayerSummaries(ids: string[]): Promise<any> {
+    if (ids && ids.length && ids.length > 0) {
+        const url = `${PLAYER_SUMMARIES_API_URL}/?key=${STEAM_API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
+        request(url, (error, response, body) => {
+            if (error) {
+                throw new Error(error);
+            }
+            return JSON.parse(body).response.players;
+        });
+    }
+    else {
+        return [];
+    }
 }
 /**
  * Utilty function to determine if path is a directory
@@ -111,6 +109,7 @@ function importConfig(): void {
 
         console.log(configObject);
 
+        // Ask for user confirmation
         confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
             writeConfig(configObject)
 
@@ -134,6 +133,7 @@ function importConfigWeb(): void {
 
             console.log(configObject);
 
+            // Ask for user confirmation
             confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
                 writeConfig(configObject)
 
@@ -147,51 +147,50 @@ function importConfigWeb(): void {
  * Export all configs to single json string
  * 
  */
-function exportConfig(): void {
+async function exportConfig() {
     // Select config directory to export
-    selectConfigDir("Which config would you like to export?").then(result => {
-        const configPath = join(userDataPath, result, cfgRelativePath);
-        const configFiles = getConfigFiles(configPath);
+    const result = await selectConfigDir("Which config would you like to export?")
+    const configPath = join(userDataPath, result, cfgRelativePath);
+    const configFiles = getConfigFiles(configPath);
 
-        const exportObject: IConfigObject = {};
+    const exportObject: IConfigObject = {};
 
-        // Read in config files
-        configFiles.forEach(file => {
-            const filename = basename(file);
-            exportObject[filename] = fs.readFileSync(file, "utf8");
-        });
-
-        // Write serialized config file out
-        fs.writeFileSync("out.json", JSON.stringify(exportObject, null, 4));
-
-        // console.log(`Config written to ${join(process.cwd, "out.json")}`);
+    // Read in config files
+    configFiles.forEach(file => {
+        const filename = basename(file);
+        exportObject[filename] = fs.readFileSync(file, "utf8");
     });
+
+    // Write serialized config file out
+    fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
+
+    console.log(`Config written to ${OUT_FILE_NAME}}`);
 }
 
 /**
  * Sync all configs from selected config
  * 
  */
-function sync(): void {
-    selectConfigDir("Which config would you like to sync from?").then(result => {
-        confirm("Are you sure you want to sync?").then(() => {
-            const configPath = join(userDataPath, result, cfgRelativePath);
-            const configFiles = getConfigFiles(configPath);
+async function sync() {
+    // Select a config to syncronize from
+    const result = await selectConfigDir("Which config would you like to sync from?");
+    confirm("Are you sure you want to sync?").then(() => {
+        const configPath = join(userDataPath, result, cfgRelativePath);
+        const configFiles = getConfigFiles(configPath);
 
-            const configObject: IConfigObject = {};
+        const configObject: IConfigObject = {};
 
-            // Grab all the config files from the source directory
-            configFiles.forEach(file => {
-                const filename = basename(file);
-                configObject[filename] = fs.readFileSync(file, "utf8");
-            });
+        // Grab all the config files from the source directory
+        configFiles.forEach(file => {
+            const filename = basename(file);
+            configObject[filename] = fs.readFileSync(file, "utf8");
+        });
 
-            // Write the config
-            writeConfig(configObject);
+        // Write the config
+        writeConfig(configObject);
 
-            console.log("Configs have been syncronized");
-        })
-    });
+        console.log("Configs have been syncronized");
+    })
 }
 
 /**
@@ -228,39 +227,38 @@ function confirm(message: string): Promise<boolean> {
  * @param {string} message 
  * @returns {Promise<string>} 
  */
-function selectConfigDir(message: string): Promise<string> {
-    return new Promise((resolve, reject) => {
+async function selectConfigDir(message: string) {
+    // Get all the config directories
+    let configDirs = getDirectories(userDataPath);
 
-        // Get all the config directories
-        let configDirs = getDirectories(userDataPath);
+    const files: any = {};
+    const playerSummaries: any = {};
 
-        const files: any = {};
-        const playerSummaries: any = {};
+    // Get player summaries so we can show account name next to steamid
+    if (STEAM_API_KEY) {
+        const response = await getPlayerSummaries(configDirs) as any[];
 
-        // Get player summaries so we can show account name next to steamid
-        getPlayerSummaries(configDirs).then(response => {
-            response.forEach(summary => {
-                playerSummaries[summary.steamid] = summary;
-            });
-
-            const choices: string[] = [];
-
-            // If there is a player summary for this ID, add the account name to the choice
-            configDirs.forEach(value => {
-                if (playerSummaries[convertTo64BitId(value)]) {
-                    choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
-                }
-                else {
-                    choices.push(value);
-                }
-            });
-
-            // Prompt user for directory
-            inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
-                const id = answers.source.split(" ")[0];
-                resolve(id);
-            });
+        response.forEach(summary => {
+            playerSummaries[summary.steamid] = summary;
         });
+    }
+
+    const choices: string[] = [];
+
+    // If there is a player summary for this ID, add the account name to the choice
+    configDirs.forEach(value => {
+        if (playerSummaries[convertTo64BitId(value)]) {
+            choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
+        }
+        else {
+            choices.push(value);
+        }
+    });
+
+    // Prompt user for directory
+    return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
+        const id = answers.source.split(" ")[0];
+        return id;
     });
 }
 
@@ -302,8 +300,11 @@ const choices: inquirer.ChoiceType[] = [
 ];
 
 
+console.log("csgo-sync");
+
+// Prompt the user for the initial option
 inquirer.prompt([{
-    type: "list", name: "option", message: "Please select one", choices: choices
+    type: "list", name: "option", message: "Please select an option", choices: choices
 }]).then((answers) => {
     main(answers.option);
 });
