@@ -113,7 +113,7 @@ function importConfig(): void {
         confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
             writeConfig(configObject)
 
-            console.log("Configs have been written");
+            console.log("Configs have been written.");
         });
     });
 }
@@ -137,7 +137,7 @@ function importConfigWeb(): void {
             confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
                 writeConfig(configObject)
 
-                console.log("Configs have been written");
+                console.log("Configs have been written.");
             });
         });
     });
@@ -164,7 +164,7 @@ async function exportConfig() {
     // Write serialized config file out
     fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
 
-    console.log(`Config written to ${OUT_FILE_NAME}}`);
+    console.log(`Config written to ${OUT_FILE_NAME}}.`);
 }
 
 /**
@@ -189,7 +189,7 @@ async function sync() {
         // Write the config
         writeConfig(configObject);
 
-        console.log("Configs have been syncronized");
+        console.log("Configs have been syncronized.");
     })
 }
 
