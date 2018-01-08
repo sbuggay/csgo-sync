@@ -13,6 +13,17 @@ This is an application to manage and syncronize your CS:GO configs across multip
 
 ## Usage
 
+Requirements:
+- Node
+
+```
+npm i -g csgo-sync
+```
+
+```
+csgo-sync
+```
+
 ### Syncronize configs
 
 This option allows you to select an account's config directory and syncronizes them across all other configs on the machine.
