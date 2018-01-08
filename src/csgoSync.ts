@@ -5,12 +5,21 @@ import * as inquirer from "inquirer";
 
 import { join, basename } from "path";
 
-// TODO: turn these into command line arguments
+import { getMatchingFiles, getDirectories, getPlayerSummaries, convertTo64BitId } from "./utility";
+
 const APP_ID = 730;
 const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
-const BIT_SHIFT: number = 61197960265728;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
 const OUT_FILE_NAME = "config.json";
+
+// TODO: turn these into command line arguments
+const USER_DATA_PATH = "C:/Program Files (x86)/Steam/userdata";
+const CFG_RELATIVE_PATH = `${APP_ID}/local/cfg`;
+const SUPPORTED_CONFIG_FILES = [
+    "config.cfg",
+    "autoexec.cfg",
+    "video.txt"
+];
 
 const resources = {
     import: "Import from file",
@@ -31,90 +40,17 @@ enum EApplicationOptions {
 }
 
 /**
- * Utility function to convert 32bit steamids to 64bit
- * 
- * @param {any} id 
- * @returns 
- */
-function convertTo64BitId(id: string): string {
-    return `765${Number(id) + BIT_SHIFT}`;
-}
-
-// TODO: Add more search paths
-const userDataPath = "C:/Program Files (x86)/Steam/userdata";
-const cfgRelativePath = `${APP_ID}/local/cfg`;
-const configFiles = [
-    "config.cfg",
-    "autoexec.cfg",
-    "video.txt"
-];
-
-/**
- * Get player summaries using steam api
- * 
- * @param {any} ids 
- * @returns 
- */
-async function getPlayerSummaries(ids: string[]): Promise<any> {
-    if (ids && ids.length && ids.length > 0) {
-        const url = `${PLAYER_SUMMARIES_API_URL}/?key=${STEAM_API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
-        request(url, (error, response, body) => {
-            if (error) {
-                throw new Error(error);
-            }
-            return JSON.parse(body).response.players;
-        });
-    }
-    else {
-        return [];
-    }
-}
-/**
- * Utilty function to determine if path is a directory
- * 
- * @param {any} path 
- * @returns 
- */
-function isDirectory(path: string): boolean {
-    return fs.lstatSync(path).isDirectory();
-}
-
-/**
- * Gets all files that match the config file mask
- * 
- * @param {any} path 
- * @returns 
- */
-function getConfigFiles(path: string): string[] {
-    return fs.readdirSync(path).filter(name => configFiles.indexOf(name) !== -1).map(value => join(path, value));
-}
-
-/**
- * Utility function to get directories of a given path
- * 
- * @param {any} path 
- * @returns 
- */
-function getDirectories(path: string): string[] {
-    return fs.readdirSync(path).filter(name => isDirectory(join(userDataPath, name)));
-}
-
-/**
  * Import config from file
  * 
  */
-function importConfig(): void {
-    inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
+function importConfig(): Promise<any> {
+    return inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
         const configObject: IConfigObject = JSON.parse(fs.readFileSync(answers.path).toString());
 
         console.log(configObject);
 
         // Ask for user confirmation
-        confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
-            writeConfig(configObject)
-
-            console.log("Configs have been written.");
-        });
+        confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?", () => writeConfig(configObject));
     });
 }
 
@@ -122,8 +58,8 @@ function importConfig(): void {
  * Import config from a URL and use the body as the config object
  * 
  */
-function importConfigWeb(): void {
-    inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
+function importConfigWeb(): Promise<any> {
+    return inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
         request(answers.url as string, (error, response, body) => {
             if (error) {
                 throw new Error(error);
@@ -134,11 +70,7 @@ function importConfigWeb(): void {
             console.log(configObject);
 
             // Ask for user confirmation
-            confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
-                writeConfig(configObject)
-
-                console.log("Configs have been written.");
-            });
+            confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?", () => writeConfig(configObject));
         });
     });
 }
@@ -147,11 +79,11 @@ function importConfigWeb(): void {
  * Export all configs to single json string
  * 
  */
-async function exportConfig() {
+async function exportConfig(): Promise<any> {
     // Select config directory to export
     const result = await selectConfigDir("Which config would you like to export?")
-    const configPath = join(userDataPath, result, cfgRelativePath);
-    const configFiles = getConfigFiles(configPath);
+    const configPath = join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+    const configFiles = getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
 
     const exportObject: IConfigObject = {};
 
@@ -164,19 +96,19 @@ async function exportConfig() {
     // Write serialized config file out
     fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
 
-    console.log(`Config written to ${OUT_FILE_NAME}}.`);
+    console.log(`Config written to ${OUT_FILE_NAME}.`);
 }
 
 /**
  * Sync all configs from selected config
  * 
  */
-async function sync() {
+async function syncConfig(): Promise<any> {
     // Select a config to syncronize from
     const result = await selectConfigDir("Which config would you like to sync from?");
-    confirm("Are you sure you want to sync?").then(() => {
-        const configPath = join(userDataPath, result, cfgRelativePath);
-        const configFiles = getConfigFiles(configPath);
+    return confirm("Are you sure you want to sync?").then(() => {
+        const configPath = join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+        const configFiles = getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
 
         const configObject: IConfigObject = {};
 
@@ -200,11 +132,13 @@ async function sync() {
  */
 function writeConfig(configObject: IConfigObject) {
     // Write this file to all config directories
-    getDirectories(userDataPath).forEach(value => {
+    getDirectories(USER_DATA_PATH).forEach(value => {
         for (const file in configObject) {
-            fs.writeFileSync(join(userDataPath, value, cfgRelativePath, file), configObject[file]);
+            fs.writeFileSync(join(USER_DATA_PATH, value, CFG_RELATIVE_PATH, file), configObject[file]);
         }
     });
+
+    console.log("Configs have been written.");
 }
 
 /**
@@ -213,10 +147,16 @@ function writeConfig(configObject: IConfigObject) {
  * @param {string} message 
  * @returns {Promise<boolean>} 
  */
-function confirm(message: string): Promise<boolean> {
+function confirm(message: string, confirmedFunction?: Function): Promise<boolean> {
     return new Promise((resolve, reject) => {
         inquirer.prompt({ type: "confirm", name: "confirm", message }).then(answer => {
-            answer ? resolve() : reject();
+            if (answer) {
+                if (confirmedFunction) confirmedFunction();
+                resolve();
+            }
+            else {
+                reject();
+            }
         });
     });
 }
@@ -229,14 +169,14 @@ function confirm(message: string): Promise<boolean> {
  */
 async function selectConfigDir(message: string) {
     // Get all the config directories
-    let configDirs = getDirectories(userDataPath);
+    let configDirs = getDirectories(USER_DATA_PATH);
 
     const files: any = {};
     const playerSummaries: any = {};
 
     // Get player summaries so we can show account name next to steamid
     if (STEAM_API_KEY) {
-        const response = await getPlayerSummaries(configDirs) as any[];
+        const response = await getPlayerSummaries(PLAYER_SUMMARIES_API_URL, STEAM_API_KEY, configDirs) as any[];
 
         response.forEach(summary => {
             playerSummaries[summary.steamid] = summary;
@@ -256,10 +196,7 @@ async function selectConfigDir(message: string) {
     });
 
     // Prompt user for directory
-    return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
-        const id = answers.source.split(" ")[0];
-        return id;
-    });
+    return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => answers.source.split(" ")[0]);
 }
 
 export default function () {
@@ -285,24 +222,21 @@ export default function () {
 
     console.log("csgo-sync");
 
+    const registeredHandlers = {
+        [EApplicationOptions.EXPORT]: exportConfig,
+        [EApplicationOptions.IMPORT]: importConfig,
+        [EApplicationOptions.IMPORTWEB]: importConfigWeb,
+        [EApplicationOptions.SYNC]: syncConfig
+    }
+
     // Prompt the user for the initial option
     inquirer.prompt([{
         type: "list", name: "option", message: "Please select an option", choices: choices
     }]).then((answers) => {
-        switch (answers.option) {
-            case EApplicationOptions.EXPORT:
-                exportConfig();
-                break;
-            case EApplicationOptions.IMPORT:
-                importConfig();
-                break;
-            case EApplicationOptions.IMPORTWEB:
-                importConfigWeb();
-                break;
-            case EApplicationOptions.SYNC:
-                sync();
-                break;
-        }
+        return registeredHandlers[answers.option as EApplicationOptions]();
+    }).then(() => {
+        // Application complete, cleanup
+        console.log("Done.");
     });
 }
 

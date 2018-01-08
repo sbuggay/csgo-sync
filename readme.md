@@ -15,7 +15,7 @@ This is an application to manage and syncronize your CS:GO configs across multip
 ## Usage
 
 Requirements:
-- Node
+- Node [https://nodejs.org/en/](https://nodejs.org/en/)
 
 ```
 npm i -g csgo-sync

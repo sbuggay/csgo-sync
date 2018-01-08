@@ -12,12 +12,19 @@ const request = require("request");
 const fs = require("fs");
 const inquirer = require("inquirer");
 const path_1 = require("path");
-// TODO: turn these into command line arguments
+const utility_1 = require("./utility");
 const APP_ID = 730;
 const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
-const BIT_SHIFT = 61197960265728;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
 const OUT_FILE_NAME = "config.json";
+// TODO: turn these into command line arguments
+const USER_DATA_PATH = "C:/Program Files (x86)/Steam/userdata";
+const CFG_RELATIVE_PATH = `${APP_ID}/local/cfg`;
+const SUPPORTED_CONFIG_FILES = [
+    "config.cfg",
+    "autoexec.cfg",
+    "video.txt"
+];
 const resources = {
     import: "Import from file",
     importweb: "Import from URL",
@@ -32,77 +39,11 @@ var EApplicationOptions;
     EApplicationOptions["SYNC"] = "SYNC";
 })(EApplicationOptions || (EApplicationOptions = {}));
 /**
- * Utility function to convert 32bit steamids to 64bit
- *
- * @param {any} id
- * @returns
- */
-function convertTo64BitId(id) {
-    return `765${Number(id) + BIT_SHIFT}`;
-}
-// TODO: Add more search paths
-const userDataPath = "C:/Program Files (x86)/Steam/userdata";
-const cfgRelativePath = `${APP_ID}/local/cfg`;
-const configFiles = [
-    "config.cfg",
-    "autoexec.cfg",
-    "video.txt"
-];
-/**
- * Get player summaries using steam api
- *
- * @param {any} ids
- * @returns
- */
-function getPlayerSummaries(ids) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (ids && ids.length && ids.length > 0) {
-            const url = `${PLAYER_SUMMARIES_API_URL}/?key=${STEAM_API_KEY}&steamids=${ids.map(convertTo64BitId).join(",")}`;
-            request(url, (error, response, body) => {
-                if (error) {
-                    throw new Error(error);
-                }
-                return JSON.parse(body).response.players;
-            });
-        }
-        else {
-            return [];
-        }
-    });
-}
-/**
- * Utilty function to determine if path is a directory
- *
- * @param {any} path
- * @returns
- */
-function isDirectory(path) {
-    return fs.lstatSync(path).isDirectory();
-}
-/**
- * Gets all files that match the config file mask
- *
- * @param {any} path
- * @returns
- */
-function getConfigFiles(path) {
-    return fs.readdirSync(path).filter(name => configFiles.indexOf(name) !== -1).map(value => path_1.join(path, value));
-}
-/**
- * Utility function to get directories of a given path
- *
- * @param {any} path
- * @returns
- */
-function getDirectories(path) {
-    return fs.readdirSync(path).filter(name => isDirectory(path_1.join(userDataPath, name)));
-}
-/**
  * Import config from file
  *
  */
 function importConfig() {
-    inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
+    return inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
         const configObject = JSON.parse(fs.readFileSync(answers.path).toString());
         console.log(configObject);
         // Ask for user confirmation
@@ -117,7 +58,7 @@ function importConfig() {
  *
  */
 function importConfigWeb() {
-    inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
+    return inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
         request(answers.url, (error, response, body) => {
             if (error) {
                 throw new Error(error);
@@ -140,8 +81,8 @@ function exportConfig() {
     return __awaiter(this, void 0, void 0, function* () {
         // Select config directory to export
         const result = yield selectConfigDir("Which config would you like to export?");
-        const configPath = path_1.join(userDataPath, result, cfgRelativePath);
-        const configFiles = getConfigFiles(configPath);
+        const configPath = path_1.join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+        const configFiles = utility_1.getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
         const exportObject = {};
         // Read in config files
         configFiles.forEach(file => {
@@ -157,13 +98,13 @@ function exportConfig() {
  * Sync all configs from selected config
  *
  */
-function sync() {
+function syncConfig() {
     return __awaiter(this, void 0, void 0, function* () {
         // Select a config to syncronize from
         const result = yield selectConfigDir("Which config would you like to sync from?");
-        confirm("Are you sure you want to sync?").then(() => {
-            const configPath = path_1.join(userDataPath, result, cfgRelativePath);
-            const configFiles = getConfigFiles(configPath);
+        return confirm("Are you sure you want to sync?").then(() => {
+            const configPath = path_1.join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+            const configFiles = utility_1.getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
             const configObject = {};
             // Grab all the config files from the source directory
             configFiles.forEach(file => {
@@ -183,9 +124,9 @@ function sync() {
  */
 function writeConfig(configObject) {
     // Write this file to all config directories
-    getDirectories(userDataPath).forEach(value => {
+    utility_1.getDirectories(USER_DATA_PATH).forEach(value => {
         for (const file in configObject) {
-            fs.writeFileSync(path_1.join(userDataPath, value, cfgRelativePath, file), configObject[file]);
+            fs.writeFileSync(path_1.join(USER_DATA_PATH, value, CFG_RELATIVE_PATH, file), configObject[file]);
         }
     });
 }
@@ -211,12 +152,12 @@ function confirm(message) {
 function selectConfigDir(message) {
     return __awaiter(this, void 0, void 0, function* () {
         // Get all the config directories
-        let configDirs = getDirectories(userDataPath);
+        let configDirs = utility_1.getDirectories(USER_DATA_PATH);
         const files = {};
         const playerSummaries = {};
         // Get player summaries so we can show account name next to steamid
         if (STEAM_API_KEY) {
-            const response = yield getPlayerSummaries(configDirs);
+            const response = yield utility_1.getPlayerSummaries(PLAYER_SUMMARIES_API_URL, STEAM_API_KEY, configDirs);
             response.forEach(summary => {
                 playerSummaries[summary.steamid] = summary;
             });
@@ -224,18 +165,15 @@ function selectConfigDir(message) {
         const choices = [];
         // If there is a player summary for this ID, add the account name to the choice
         configDirs.forEach(value => {
-            if (playerSummaries[convertTo64BitId(value)]) {
-                choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
+            if (playerSummaries[utility_1.convertTo64BitId(value)]) {
+                choices.push(`${value} [${playerSummaries[utility_1.convertTo64BitId(value)].personaname}]`);
             }
             else {
                 choices.push(value);
             }
         });
         // Prompt user for directory
-        return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
-            const id = answers.source.split(" ")[0];
-            return id;
-        });
+        return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => answers.source.split(" ")[0]);
     });
 }
 function default_1() {
@@ -259,24 +197,20 @@ function default_1() {
         },
     ];
     console.log("csgo-sync");
+    const registeredHandlers = {
+        [EApplicationOptions.EXPORT]: exportConfig,
+        [EApplicationOptions.IMPORT]: importConfig,
+        [EApplicationOptions.IMPORTWEB]: importConfigWeb,
+        [EApplicationOptions.SYNC]: syncConfig
+    };
     // Prompt the user for the initial option
     inquirer.prompt([{
             type: "list", name: "option", message: "Please select an option", choices: choices
         }]).then((answers) => {
-        switch (answers.option) {
-            case EApplicationOptions.EXPORT:
-                exportConfig();
-                break;
-            case EApplicationOptions.IMPORT:
-                importConfig();
-                break;
-            case EApplicationOptions.IMPORTWEB:
-                importConfigWeb();
-                break;
-            case EApplicationOptions.SYNC:
-                sync();
-                break;
-        }
+        return registeredHandlers[answers.option]();
+    }).then(() => {
+        // Application complete, cleanup
+        console.log("Done.");
     });
 }
 exports.default = default_1;
