@@ -1,7 +1,20 @@
 # csgo-sync
 [![npm version](https://badge.fury.io/js/csgo-sync.svg)](https://badge.fury.io/js/csgo-sync)
 
-This is an application to manage and syncronize your CS:GO configs across multiple computers and accounts.
+csgo-sync is an application to manage and syncronize your CS:GO configs across multiple computers and accounts.  
+While designed to work with CS:GO, csgo-sync is extensible enough to work for anything that uses multiple file-based configurations. For example to work for CS:S you can simply pass `--appId 240` at the command line.
+
+## Usage
+
+Requirements:
+- Node [https://nodejs.org/en/](https://nodejs.org/en/)
+
+After Node is installed, simply install csgo-sync globally and use it.
+
+```
+npm i -g csgo-sync
+csgo-sync
+```
 
 ```
 ? Please select an option
@@ -10,35 +23,6 @@ This is an application to manage and syncronize your CS:GO configs across multip
   Import from URL
   ──────────────
   Export config
-```
-
-## Usage
-
-Requirements:
-- Node [https://nodejs.org/en/](https://nodejs.org/en/)
-
-```
-npm i -g csgo-sync
-```
-
-```
-csgo-sync
-```
-
-```
-csgo-sync --help
-
-  Usage: entry [options]
-
-  Options:
-
-    -V, --version                 output the version number
-    -a, --appId                   appid for selected game. default: 730 (CS:GO)
-    -o, --outFile                 filename and path to export a config object to. default: ./config.json
-    -u, --userDataPath <path>     Path to use for userdata. default: C:/Program Files (x86)/Steam/userdata
-    -r, --cfgRelativePath <path>  Relative path from userdata. default: /local/cfg
-    --steamApiKey <key>           Steam API key to resolve account names against Steam IDs.
-    -h, --help                    output usage information
 ```
 
 ### Syncronize configs
@@ -73,5 +57,21 @@ The files exported by default are:
 
 ## Options
 
-If the `STEAM_API_KEY` environment variable is set to a valid Steam API key, csgo-sync will attempt to resolve your config ids against their account name during selection.  
+```
+csgo-sync --help
+
+  Usage: entry [options]
+
+  Options:
+
+    -V, --version                 output the version number
+    -a, --appId                   appid for selected game. default: 730 (CS:GO)
+    -o, --outFile                 filename and path to export a config object to. default: ./config.json
+    -u, --userDataPath <path>     Path to use for userdata. default: C:/Program Files (x86)/Steam/userdata
+    -r, --cfgRelativePath <path>  Relative path from userdata. default: /local/cfg
+    --steamApiKey <key>           Steam API key to resolve account names against Steam IDs.
+    -h, --help                    output usage information
+```
+
+If the `STEAM_API_KEY` environment variable is set to a valid Steam API key, csgo-sync will attempt to resolve your config ids against their account name during selection. You can also pass this in through the command line flag `--steamApiKey`.
 You can get a Steam API key here: [http://steamcommunity.com/dev/apikey](http://steamcommunity.com/dev/apikey)
