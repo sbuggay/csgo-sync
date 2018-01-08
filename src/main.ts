@@ -101,17 +101,44 @@ function getDirectories(path: string): string[] {
     return fs.readdirSync(path).filter(name => isDirectory(join(userDataPath, name)));
 }
 
-function importConfig(web: boolean = false): void {
-    inquirer.prompt([{
-        type: "input",
-        name: "url",
-        message: "Please enter the url of your config"
-    }]).then((answers) => {
+/**
+ * Import config from file
+ * 
+ */
+function importConfig(): void {
+    inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
+        const configObject: IConfigObject = JSON.parse(fs.readFileSync(answers.path).toString());
+
+        console.log(configObject);
+
+        confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
+            writeConfig(configObject)
+
+            console.log("Configs have been written");
+        });
+    });
+}
+
+/**
+ * Import config from a URL and use the body as the config object
+ * 
+ */
+function importConfigWeb(): void {
+    inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
         request(answers.url as string, (error, response, body) => {
             if (error) {
                 throw new Error(error);
             }
-            console.log(body);
+
+            const configObject: IConfigObject = JSON.parse(body);
+
+            console.log(configObject);
+
+            confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
+                writeConfig(configObject)
+
+                console.log("Configs have been written");
+            });
         });
     });
 }
@@ -135,9 +162,9 @@ function exportConfig(): void {
         });
 
         // Write serialized config file out
-        fs.writeFileSync("out.json", JSON.stringify(exportObject));
+        fs.writeFileSync("out.json", JSON.stringify(exportObject, null, 4));
 
-        console.log(`Config written to ${join(process.cwd, "out.json")}`);
+        // console.log(`Config written to ${join(process.cwd, "out.json")}`);
     });
 }
 
@@ -161,10 +188,17 @@ function sync(): void {
 
             // Write the config
             writeConfig(configObject);
+
+            console.log("Configs have been syncronized");
         })
     });
 }
 
+/**
+ * Helper function to write config object to all supported config directories
+ * 
+ * @param {IConfigObject} configObject 
+ */
 function writeConfig(configObject: IConfigObject) {
     // Write this file to all config directories
     getDirectories(userDataPath).forEach(value => {
@@ -182,17 +216,8 @@ function writeConfig(configObject: IConfigObject) {
  */
 function confirm(message: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
-        inquirer.prompt({
-            type: "confirm",
-            name: "confirm",
-            message
-        }).then(answer => {
-            if (answer) {
-                resolve();
-            }
-            else {
-                reject();
-            }
+        inquirer.prompt({ type: "confirm", name: "confirm", message }).then(answer => {
+            answer ? resolve() : reject();
         });
     });
 }
@@ -230,12 +255,8 @@ function selectConfigDir(message: string): Promise<string> {
                 }
             });
 
-            inquirer.prompt([{
-                type: "list",
-                name: "source",
-                message,
-                choices
-            }]).then(answers => {
+            // Prompt user for directory
+            inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
                 const id = answers.source.split(" ")[0];
                 resolve(id);
             });
@@ -252,7 +273,7 @@ function main(option: EApplicationOptions) {
             importConfig();
             break;
         case EApplicationOptions.IMPORTWEB:
-            importConfig(true);
+            importConfigWeb();
             break;
         case EApplicationOptions.SYNC:
             sync();
@@ -282,10 +303,7 @@ const choices: inquirer.ChoiceType[] = [
 
 
 inquirer.prompt([{
-    type: "list",
-    name: "option",
-    message: "Please select one",
-    choices: choices
+    type: "list", name: "option", message: "Please select one", choices: choices
 }]).then((answers) => {
     main(answers.option);
 });

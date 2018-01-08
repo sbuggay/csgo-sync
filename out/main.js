@@ -89,17 +89,28 @@ function getConfigFiles(path) {
 function getDirectories(path) {
     return fs.readdirSync(path).filter(name => isDirectory(path_1.join(userDataPath, name)));
 }
-function importConfig(web = false) {
-    inquirer.prompt([{
-            type: "input",
-            name: "url",
-            message: "Please enter the url of your config"
-        }]).then((answers) => {
+function importConfig() {
+    inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
+        const configObject = JSON.parse(fs.readFileSync(answers.path).toString());
+        console.log(configObject);
+        confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
+            writeConfig(configObject);
+            console.log("Configs have been written");
+        });
+    });
+}
+function importConfigWeb() {
+    inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
         request(answers.url, (error, response, body) => {
             if (error) {
                 throw new Error(error);
             }
-            console.log(body);
+            const configObject = JSON.parse(body);
+            console.log(configObject);
+            confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
+                writeConfig(configObject);
+                console.log("Configs have been written");
+            });
         });
     });
 }
@@ -119,8 +130,8 @@ function exportConfig() {
             exportObject[filename] = fs.readFileSync(file, "utf8");
         });
         // Write serialized config file out
-        fs.writeFileSync("out.json", JSON.stringify(exportObject));
-        console.log(`Config written to ${path_1.join(process.cwd, "out.json")}`);
+        fs.writeFileSync("out.json", JSON.stringify(exportObject, null, 4));
+        // console.log(`Config written to ${join(process.cwd, "out.json")}`);
     });
 }
 /**
@@ -129,24 +140,32 @@ function exportConfig() {
  */
 function sync() {
     selectConfigDir("Which config would you like to sync from?").then(result => {
-        confirm("Are you sure you want to sync?").then(confirmation => {
+        confirm("Are you sure you want to sync?").then(() => {
             const configPath = path_1.join(userDataPath, result, cfgRelativePath);
             const configFiles = getConfigFiles(configPath);
-            const files = {};
+            const configObject = {};
             // Grab all the config files from the source directory
             configFiles.forEach(file => {
                 const filename = path_1.basename(file);
-                files[filename] = fs.readFileSync(file, "utf8");
+                configObject[filename] = fs.readFileSync(file, "utf8");
             });
-            // Write this file to all other config directories
-            if (confirmation) {
-                getDirectories(userDataPath).forEach(value => {
-                    for (const file in files) {
-                        fs.writeFileSync(path_1.join(userDataPath, value, cfgRelativePath, file), files[file]);
-                    }
-                });
-            }
+            // Write the config
+            writeConfig(configObject);
+            console.log("Configs have been syncronized");
         });
+    });
+}
+/**
+ * Helper function to write config object to all supported config directories
+ *
+ * @param {IConfigObject} configObject
+ */
+function writeConfig(configObject) {
+    // Write this file to all config directories
+    getDirectories(userDataPath).forEach(value => {
+        for (const file in configObject) {
+            fs.writeFileSync(path_1.join(userDataPath, value, cfgRelativePath, file), configObject[file]);
+        }
     });
 }
 /**
@@ -157,12 +176,8 @@ function sync() {
  */
 function confirm(message) {
     return new Promise((resolve, reject) => {
-        inquirer.prompt({
-            type: "confirm",
-            name: "confirm",
-            message
-        }).then(answer => {
-            resolve(answer.confirm);
+        inquirer.prompt({ type: "confirm", name: "confirm", message }).then(answer => {
+            answer ? resolve() : reject();
         });
     });
 }
@@ -184,6 +199,7 @@ function selectConfigDir(message) {
                 playerSummaries[summary.steamid] = summary;
             });
             const choices = [];
+            // If there is a player summary for this ID, add the account name to the choice
             configDirs.forEach(value => {
                 if (playerSummaries[convertTo64BitId(value)]) {
                     choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
@@ -192,12 +208,8 @@ function selectConfigDir(message) {
                     choices.push(value);
                 }
             });
-            inquirer.prompt([{
-                    type: "list",
-                    name: "source",
-                    message,
-                    choices
-                }]).then(answers => {
+            // Prompt user for directory
+            inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => {
                 const id = answers.source.split(" ")[0];
                 resolve(id);
             });
@@ -213,7 +225,7 @@ function main(option) {
             importConfig();
             break;
         case EApplicationOptions.IMPORTWEB:
-            importConfig(true);
+            importConfigWeb();
             break;
         case EApplicationOptions.SYNC:
             sync();
@@ -240,11 +252,7 @@ const choices = [
     },
 ];
 inquirer.prompt([{
-        type: "list",
-        name: "option",
-        message: "Please select one",
-        choices: choices
+        type: "list", name: "option", message: "Please select one", choices: choices
     }]).then((answers) => {
     main(answers.option);
 });
-//# sourceMappingURL=main.js.map
