@@ -10,6 +10,8 @@ This is an application to manage and syncronize your CS:GO configs across multip
   Export config
 ```
 
+## Usage
+
 ### Syncronize configs
 This option allows you to select an account's config directory and syncronizes them across all other configs on the machine.
 
@@ -35,3 +37,7 @@ The files exported by default are:
 - autoexec.cfg
 - config.cfg
 - video.txt
+
+## Options
+If the `STEAM_API_KEY` environment variable is set to a valid Steam API key, csgo-sync will attempt to resolve your config ids against their account name during selection.  
+You can get a Steam API key here: [http://steamcommunity.com/dev/apikey](http://steamcommunity.com/dev/apikey)
