@@ -9,12 +9,8 @@ const packageJson = require("../package.json");
 import { getMatchingFiles, getDirectories, getPlayerSummaries, convertTo64BitId } from "./utility";
 
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
-const SUPPORTED_CONFIG_FILES = [
-    "config.cfg",
-    "autoexec.cfg",
-    "video.txt"
-];
 
+// TODO: language support
 const resources = {
     import: "Import from file",
     importweb: "Import from URL",
@@ -27,19 +23,21 @@ interface IConfigObject {
 }
 
 interface IApplicationConfiguration {
-    appId: number,
-    outFile: string,
+    outFile: string;
+    appId: string;
     userDataPath: string;
     cfgRelativePath: string;
+    supportedConfigFiles: string[]
     steamApiKey?: string;
 }
 
 // Default configuration values
 let appConfiguration: IApplicationConfiguration = {
-    appId: 730,
+    appId: "730",
     outFile: "config.json",
     userDataPath: "C:/Program Files (x86)/Steam/userdata",
     cfgRelativePath: "/local/cfg",
+    supportedConfigFiles: ["config.cfg", "autoexec.cfg", "video.txt"],
     steamApiKey: process.env.STEAM_API_KEY || null
 }
 
@@ -53,6 +51,7 @@ enum EApplicationOptions {
 /**
  * Import config from file
  * 
+ * @returns {Promise<any>}
  */
 function importConfig(): Promise<any> {
     return inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
@@ -68,6 +67,7 @@ function importConfig(): Promise<any> {
 /**
  * Import config from a URL and use the body as the config object
  * 
+ * @returns {Promise<any>}
  */
 function importConfigWeb(): Promise<any> {
     return inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
@@ -89,12 +89,13 @@ function importConfigWeb(): Promise<any> {
 /**
  * Export all configs to single json string
  * 
+ * @returns {Promise<any>}
  */
 async function exportConfig(): Promise<any> {
     // Select config directory to export
     const result = await selectConfigDir("Which config would you like to export?")
     const configPath = join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
-    const configFiles = getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
+    const configFiles = getMatchingFiles(configPath, appConfiguration.supportedConfigFiles);
 
     const exportObject: IConfigObject = {};
 
@@ -113,13 +114,14 @@ async function exportConfig(): Promise<any> {
 /**
  * Sync all configs from selected config
  * 
+ * @returns {Promise<any>}
  */
 async function syncConfig(): Promise<any> {
     // Select a config to syncronize from
     const result = await selectConfigDir("Which config would you like to sync from?");
     return confirm("Are you sure you want to sync?").then(() => {
         const configPath = join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
-        const configFiles = getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
+        const configFiles = getMatchingFiles(configPath, appConfiguration.supportedConfigFiles);
 
         const configObject: IConfigObject = {};
 

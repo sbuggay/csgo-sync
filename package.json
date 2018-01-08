@@ -1,14 +1,14 @@
 {
   "name": "csgo-sync",
   "version": "1.0.1",
-  "description": "",
+  "description": "Application to maintain and sync game configurations",
   "bin": {
     "csgo-sync": "bin/entry.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Devan Buggay",
   "license": "ISC",
   "preferGlobal": true,
   "dependencies": {

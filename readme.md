@@ -27,7 +27,7 @@ csgo-sync
 
 ### Syncronize configs
 
-This option allows you to select an account's config directory and syncronizes them across all other configs on the machine.
+This option allows you to select an account's config directory and syncronize them across all other configs on the machine.
 
 ```
 ? Please select an option Syncronize configs
