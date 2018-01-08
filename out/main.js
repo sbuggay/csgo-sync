@@ -89,6 +89,10 @@ function getConfigFiles(path) {
 function getDirectories(path) {
     return fs.readdirSync(path).filter(name => isDirectory(path_1.join(userDataPath, name)));
 }
+/**
+ * Import config from file
+ *
+ */
 function importConfig() {
     inquirer.prompt([{ type: "input", name: "path", message: "Please enter the path of your config: " }]).then((answers) => {
         const configObject = JSON.parse(fs.readFileSync(answers.path).toString());
@@ -99,6 +103,10 @@ function importConfig() {
         });
     });
 }
+/**
+ * Import config from a URL and use the body as the config object
+ *
+ */
 function importConfigWeb() {
     inquirer.prompt([{ type: "input", name: "url", message: "Please enter the URL of your config: " }]).then((answers) => {
         request(answers.url, (error, response, body) => {
