@@ -1,20 +1,14 @@
 import * as request from "request";
 import * as fs from "fs";
-
 import * as inquirer from "inquirer";
-
 import { join, basename } from "path";
+
+const program = require("commander");
+const packageJson = require("../package.json");
 
 import { getMatchingFiles, getDirectories, getPlayerSummaries, convertTo64BitId } from "./utility";
 
-const APP_ID = 730;
-const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
-const OUT_FILE_NAME = "config.json";
-
-// TODO: turn these into command line arguments
-const USER_DATA_PATH = "C:/Program Files (x86)/Steam/userdata";
-const CFG_RELATIVE_PATH = `${APP_ID}/local/cfg`;
 const SUPPORTED_CONFIG_FILES = [
     "config.cfg",
     "autoexec.cfg",
@@ -30,6 +24,23 @@ const resources = {
 
 interface IConfigObject {
     [key: string]: string;
+}
+
+interface IApplicationConfiguration {
+    appId: number,
+    outFile: string,
+    userDataPath: string;
+    cfgRelativePath: string;
+    steamApiKey?: string;
+}
+
+// Default configuration values
+let appConfiguration: IApplicationConfiguration = {
+    appId: 730,
+    outFile: "config.json",
+    userDataPath: "C:/Program Files (x86)/Steam/userdata",
+    cfgRelativePath: "/local/cfg",
+    steamApiKey: process.env.STEAM_API_KEY || null
 }
 
 enum EApplicationOptions {
@@ -82,7 +93,7 @@ function importConfigWeb(): Promise<any> {
 async function exportConfig(): Promise<any> {
     // Select config directory to export
     const result = await selectConfigDir("Which config would you like to export?")
-    const configPath = join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+    const configPath = join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
     const configFiles = getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
 
     const exportObject: IConfigObject = {};
@@ -94,9 +105,9 @@ async function exportConfig(): Promise<any> {
     });
 
     // Write serialized config file out
-    fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
+    fs.writeFileSync(appConfiguration.outFile, JSON.stringify(exportObject, null, 4));
 
-    console.log(`Config written to ${OUT_FILE_NAME}.`);
+    console.log(`Config written to ${appConfiguration.outFile}.`);
 }
 
 /**
@@ -107,7 +118,7 @@ async function syncConfig(): Promise<any> {
     // Select a config to syncronize from
     const result = await selectConfigDir("Which config would you like to sync from?");
     return confirm("Are you sure you want to sync?").then(() => {
-        const configPath = join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+        const configPath = join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
         const configFiles = getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
 
         const configObject: IConfigObject = {};
@@ -132,9 +143,9 @@ async function syncConfig(): Promise<any> {
  */
 function writeConfig(configObject: IConfigObject) {
     // Write this file to all config directories
-    getDirectories(USER_DATA_PATH).forEach(value => {
+    getDirectories(appConfiguration.userDataPath).forEach(value => {
         for (const file in configObject) {
-            fs.writeFileSync(join(USER_DATA_PATH, value, CFG_RELATIVE_PATH, file), configObject[file]);
+            fs.writeFileSync(join(appConfiguration.userDataPath, value, appConfiguration.appId, appConfiguration.cfgRelativePath, file), configObject[file]);
         }
     });
 
@@ -169,14 +180,14 @@ function confirm(message: string, confirmedFunction?: Function): Promise<boolean
  */
 async function selectConfigDir(message: string) {
     // Get all the config directories
-    let configDirs = getDirectories(USER_DATA_PATH);
+    let configDirs = getDirectories(appConfiguration.userDataPath);
 
     const files: any = {};
     const playerSummaries: any = {};
 
     // Get player summaries so we can show account name next to steamid
-    if (STEAM_API_KEY) {
-        const response = await getPlayerSummaries(PLAYER_SUMMARIES_API_URL, STEAM_API_KEY, configDirs) as any[];
+    if (appConfiguration.steamApiKey) {
+        const response = await getPlayerSummaries(PLAYER_SUMMARIES_API_URL, appConfiguration.steamApiKey, configDirs) as any[];
 
         response.forEach(summary => {
             playerSummaries[summary.steamid] = summary;
@@ -199,28 +210,42 @@ async function selectConfigDir(message: string) {
     return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => answers.source.split(" ")[0]);
 }
 
+/**
+ * Entry function
+ * 
+ * @export
+ */
 export default function () {
-    const choices: inquirer.ChoiceType[] = [
-        {
-            name: resources.sync,
-            value: EApplicationOptions.SYNC,
-        },
-        {
-            name: resources.import,
-            value: EApplicationOptions.IMPORT
-        },
-        {
-            name: resources.importweb,
-            value: EApplicationOptions.IMPORTWEB
-        },
-        new inquirer.Separator(),
-        {
-            name: resources.export,
-            value: EApplicationOptions.EXPORT
-        },
-    ];
+    program
+        .version(packageJson.version)
+        .option("-a, --appId", "appid for selected game. default: 730 (CS:GO)")
+        .option("-o, --outFile", "filename and path to export a config object to. default: ./config.json")
+        .option("-u, --userDataPath <path>", "Path to use for userdata. default: C:/Program Files (x86)/Steam/userdata")
+        .option("-r, --cfgRelativePath <path>", "Relative path from userdata. default: /local/cfg")
+        .option("--steamApiKey <key>", "Steam API key to resolve account names against Steam IDs.")
+        .parse(process.argv);
 
-    console.log("csgo-sync");
+    // TODO: Replace this with an extensible assign or something
+    appConfiguration.appId = program.appId || appConfiguration.appId;
+    appConfiguration.outFile = program.outFile || appConfiguration.outFile;
+    appConfiguration.userDataPath = program.userDataPath || appConfiguration.userDataPath;
+    appConfiguration.cfgRelativePath = program.cfgRelativePath || appConfiguration.cfgRelativePath;
+    appConfiguration.steamApiKey = program.steamApiKey || appConfiguration.steamApiKey;
+
+    const choices: inquirer.ChoiceType[] = [{
+        name: resources.sync,
+        value: EApplicationOptions.SYNC,
+    }, {
+        name: resources.import,
+        value: EApplicationOptions.IMPORT
+    }, {
+        name: resources.importweb,
+        value: EApplicationOptions.IMPORTWEB
+    },
+    new inquirer.Separator(), {
+        name: resources.export,
+        value: EApplicationOptions.EXPORT
+    }];
 
     const registeredHandlers = {
         [EApplicationOptions.EXPORT]: exportConfig,

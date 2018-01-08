@@ -25,6 +25,22 @@ npm i -g csgo-sync
 csgo-sync
 ```
 
+```
+csgo-sync --help
+
+  Usage: entry [options]
+
+  Options:
+
+    -V, --version                 output the version number
+    -a, --appId                   appid for selected game. default: 730 (CS:GO)
+    -o, --outFile                 filename and path to export a config object to. default: ./config.json
+    -u, --userDataPath <path>     Path to use for userdata. default: C:/Program Files (x86)/Steam/userdata
+    -r, --cfgRelativePath <path>  Relative path from userdata. default: /local/cfg
+    --steamApiKey <key>           Steam API key to resolve account names against Steam IDs.
+    -h, --help                    output usage information
+```
+
 ### Syncronize configs
 
 This option allows you to select an account's config directory and syncronizes them across all other configs on the machine.

@@ -12,14 +12,10 @@ const request = require("request");
 const fs = require("fs");
 const inquirer = require("inquirer");
 const path_1 = require("path");
+const program = require("commander");
+const packageJson = require("../package.json");
 const utility_1 = require("./utility");
-const APP_ID = 730;
-const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
-const OUT_FILE_NAME = "config.json";
-// TODO: turn these into command line arguments
-const USER_DATA_PATH = "C:/Program Files (x86)/Steam/userdata";
-const CFG_RELATIVE_PATH = `${APP_ID}/local/cfg`;
 const SUPPORTED_CONFIG_FILES = [
     "config.cfg",
     "autoexec.cfg",
@@ -30,6 +26,14 @@ const resources = {
     importweb: "Import from URL",
     export: "Export config",
     sync: "Syncronize configs"
+};
+// Default configuration values
+let appConfiguration = {
+    appId: 730,
+    outFile: "config.json",
+    userDataPath: "C:/Program Files (x86)/Steam/userdata",
+    cfgRelativePath: "/local/cfg",
+    steamApiKey: process.env.STEAM_API_KEY || null
 };
 var EApplicationOptions;
 (function (EApplicationOptions) {
@@ -47,10 +51,7 @@ function importConfig() {
         const configObject = JSON.parse(fs.readFileSync(answers.path).toString());
         console.log(configObject);
         // Ask for user confirmation
-        confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
-            writeConfig(configObject);
-            console.log("Configs have been written.");
-        });
+        confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?", () => writeConfig(configObject));
     });
 }
 /**
@@ -66,10 +67,7 @@ function importConfigWeb() {
             const configObject = JSON.parse(body);
             console.log(configObject);
             // Ask for user confirmation
-            confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
-                writeConfig(configObject);
-                console.log("Configs have been written.");
-            });
+            confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?", () => writeConfig(configObject));
         });
     });
 }
@@ -81,7 +79,7 @@ function exportConfig() {
     return __awaiter(this, void 0, void 0, function* () {
         // Select config directory to export
         const result = yield selectConfigDir("Which config would you like to export?");
-        const configPath = path_1.join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+        const configPath = path_1.join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
         const configFiles = utility_1.getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
         const exportObject = {};
         // Read in config files
@@ -90,8 +88,8 @@ function exportConfig() {
             exportObject[filename] = fs.readFileSync(file, "utf8");
         });
         // Write serialized config file out
-        fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
-        console.log(`Config written to ${OUT_FILE_NAME}}.`);
+        fs.writeFileSync(appConfiguration.outFile, JSON.stringify(exportObject, null, 4));
+        console.log(`Config written to ${appConfiguration.outFile}.`);
     });
 }
 /**
@@ -103,7 +101,7 @@ function syncConfig() {
         // Select a config to syncronize from
         const result = yield selectConfigDir("Which config would you like to sync from?");
         return confirm("Are you sure you want to sync?").then(() => {
-            const configPath = path_1.join(USER_DATA_PATH, result, CFG_RELATIVE_PATH);
+            const configPath = path_1.join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
             const configFiles = utility_1.getMatchingFiles(configPath, SUPPORTED_CONFIG_FILES);
             const configObject = {};
             // Grab all the config files from the source directory
@@ -124,11 +122,12 @@ function syncConfig() {
  */
 function writeConfig(configObject) {
     // Write this file to all config directories
-    utility_1.getDirectories(USER_DATA_PATH).forEach(value => {
+    utility_1.getDirectories(appConfiguration.userDataPath).forEach(value => {
         for (const file in configObject) {
-            fs.writeFileSync(path_1.join(USER_DATA_PATH, value, CFG_RELATIVE_PATH, file), configObject[file]);
+            fs.writeFileSync(path_1.join(appConfiguration.userDataPath, value, appConfiguration.appId, appConfiguration.cfgRelativePath, file), configObject[file]);
         }
     });
+    console.log("Configs have been written.");
 }
 /**
  * Helper function to ask for confirmation
@@ -136,10 +135,17 @@ function writeConfig(configObject) {
  * @param {string} message
  * @returns {Promise<boolean>}
  */
-function confirm(message) {
+function confirm(message, confirmedFunction) {
     return new Promise((resolve, reject) => {
         inquirer.prompt({ type: "confirm", name: "confirm", message }).then(answer => {
-            answer ? resolve() : reject();
+            if (answer) {
+                if (confirmedFunction)
+                    confirmedFunction();
+                resolve();
+            }
+            else {
+                reject();
+            }
         });
     });
 }
@@ -152,12 +158,12 @@ function confirm(message) {
 function selectConfigDir(message) {
     return __awaiter(this, void 0, void 0, function* () {
         // Get all the config directories
-        let configDirs = utility_1.getDirectories(USER_DATA_PATH);
+        let configDirs = utility_1.getDirectories(appConfiguration.userDataPath);
         const files = {};
         const playerSummaries = {};
         // Get player summaries so we can show account name next to steamid
-        if (STEAM_API_KEY) {
-            const response = yield utility_1.getPlayerSummaries(PLAYER_SUMMARIES_API_URL, STEAM_API_KEY, configDirs);
+        if (appConfiguration.steamApiKey) {
+            const response = yield utility_1.getPlayerSummaries(PLAYER_SUMMARIES_API_URL, appConfiguration.steamApiKey, configDirs);
             response.forEach(summary => {
                 playerSummaries[summary.steamid] = summary;
             });
@@ -176,27 +182,40 @@ function selectConfigDir(message) {
         return inquirer.prompt([{ type: "list", name: "source", message, choices }]).then(answers => answers.source.split(" ")[0]);
     });
 }
+/**
+ * Entry function
+ *
+ * @export
+ */
 function default_1() {
-    const choices = [
-        {
+    program
+        .version(packageJson.version)
+        .option("-a, --appId", "appid for selected game. default: 730 (CS:GO)")
+        .option("-o, --outFile", "filename and path to export a config object to. default: ./config.json")
+        .option("-u, --userDataPath <path>", "Path to use for userdata. default: C:/Program Files (x86)/Steam/userdata")
+        .option("-r, --cfgRelativePath <path>", "Relative path from userdata. default: /local/cfg")
+        .option("--steamApiKey <key>", "Steam API key to resolve account names against Steam IDs.")
+        .parse(process.argv);
+    // TODO: Replace this with an extensible assign or something
+    appConfiguration.appId = program.appId || appConfiguration.appId;
+    appConfiguration.outFile = program.outFile || appConfiguration.outFile;
+    appConfiguration.userDataPath = program.userDataPath || appConfiguration.userDataPath;
+    appConfiguration.cfgRelativePath = program.cfgRelativePath || appConfiguration.cfgRelativePath;
+    appConfiguration.steamApiKey = program.steamApiKey || appConfiguration.steamApiKey;
+    const choices = [{
             name: resources.sync,
             value: EApplicationOptions.SYNC,
-        },
-        {
+        }, {
             name: resources.import,
             value: EApplicationOptions.IMPORT
-        },
-        {
+        }, {
             name: resources.importweb,
             value: EApplicationOptions.IMPORTWEB
         },
-        new inquirer.Separator(),
-        {
+        new inquirer.Separator(), {
             name: resources.export,
             value: EApplicationOptions.EXPORT
-        },
-    ];
-    console.log("csgo-sync");
+        }];
     const registeredHandlers = {
         [EApplicationOptions.EXPORT]: exportConfig,
         [EApplicationOptions.IMPORT]: importConfig,
