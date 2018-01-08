@@ -4,8 +4,7 @@
         "target": "es2015",
         "noImplicitAny": true,
         "strict": true,
-        "outDir": "./out",
-        "sourceMap": true
+        "outDir": "./out"
     },
     "include": [
         "src/**/*"
