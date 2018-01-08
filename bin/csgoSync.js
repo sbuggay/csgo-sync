@@ -238,7 +238,7 @@ function selectConfigDir(message) {
         });
     });
 }
-function main(option) {
+function default_1() {
     const choices = [
         {
             name: resources.sync,
@@ -279,4 +279,4 @@ function main(option) {
         }
     });
 }
-exports.default = main;
+exports.default = default_1;

@@ -262,7 +262,7 @@ async function selectConfigDir(message: string) {
     });
 }
 
-export default function main(option: EApplicationOptions) {
+export default function () {
     const choices: inquirer.ChoiceType[] = [
         {
             name: resources.sync,
