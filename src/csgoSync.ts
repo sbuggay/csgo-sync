@@ -262,50 +262,47 @@ async function selectConfigDir(message: string) {
     });
 }
 
-function main(option: EApplicationOptions) {
-    switch (option) {
-        case EApplicationOptions.EXPORT:
-            exportConfig();
-            break;
-        case EApplicationOptions.IMPORT:
-            importConfig();
-            break;
-        case EApplicationOptions.IMPORTWEB:
-            importConfigWeb();
-            break;
-        case EApplicationOptions.SYNC:
-            sync();
-            break;
-    }
+export default function main(option: EApplicationOptions) {
+    const choices: inquirer.ChoiceType[] = [
+        {
+            name: resources.sync,
+            value: EApplicationOptions.SYNC,
+        },
+        {
+            name: resources.import,
+            value: EApplicationOptions.IMPORT
+        },
+        {
+            name: resources.importweb,
+            value: EApplicationOptions.IMPORTWEB
+        },
+        new inquirer.Separator(),
+        {
+            name: resources.export,
+            value: EApplicationOptions.EXPORT
+        },
+    ];
+
+    console.log("csgo-sync");
+
+    // Prompt the user for the initial option
+    inquirer.prompt([{
+        type: "list", name: "option", message: "Please select an option", choices: choices
+    }]).then((answers) => {
+        switch (answers.option) {
+            case EApplicationOptions.EXPORT:
+                exportConfig();
+                break;
+            case EApplicationOptions.IMPORT:
+                importConfig();
+                break;
+            case EApplicationOptions.IMPORTWEB:
+                importConfigWeb();
+                break;
+            case EApplicationOptions.SYNC:
+                sync();
+                break;
+        }
+    });
 }
-
-const choices: inquirer.ChoiceType[] = [
-    {
-        name: resources.sync,
-        value: EApplicationOptions.SYNC,
-    },
-    {
-        name: resources.import,
-        value: EApplicationOptions.IMPORT
-    },
-    {
-        name: resources.importweb,
-        value: EApplicationOptions.IMPORTWEB
-    },
-    new inquirer.Separator(),
-    {
-        name: resources.export,
-        value: EApplicationOptions.EXPORT
-    },
-];
-
-
-console.log("csgo-sync");
-
-// Prompt the user for the initial option
-inquirer.prompt([{
-    type: "list", name: "option", message: "Please select an option", choices: choices
-}]).then((answers) => {
-    main(answers.option);
-});
 

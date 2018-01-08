@@ -108,7 +108,7 @@ function importConfig() {
         // Ask for user confirmation
         confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
             writeConfig(configObject);
-            console.log("Configs have been written");
+            console.log("Configs have been written.");
         });
     });
 }
@@ -127,7 +127,7 @@ function importConfigWeb() {
             // Ask for user confirmation
             confirm("Here is the config file we parsed, please make sure nothing looks suspicious. Continue?").then(() => {
                 writeConfig(configObject);
-                console.log("Configs have been written");
+                console.log("Configs have been written.");
             });
         });
     });
@@ -150,7 +150,7 @@ function exportConfig() {
         });
         // Write serialized config file out
         fs.writeFileSync(OUT_FILE_NAME, JSON.stringify(exportObject, null, 4));
-        console.log(`Config written to ${OUT_FILE_NAME}}`);
+        console.log(`Config written to ${OUT_FILE_NAME}}.`);
     });
 }
 /**
@@ -172,7 +172,7 @@ function sync() {
             });
             // Write the config
             writeConfig(configObject);
-            console.log("Configs have been syncronized");
+            console.log("Configs have been syncronized.");
         });
     });
 }
@@ -239,44 +239,44 @@ function selectConfigDir(message) {
     });
 }
 function main(option) {
-    switch (option) {
-        case EApplicationOptions.EXPORT:
-            exportConfig();
-            break;
-        case EApplicationOptions.IMPORT:
-            importConfig();
-            break;
-        case EApplicationOptions.IMPORTWEB:
-            importConfigWeb();
-            break;
-        case EApplicationOptions.SYNC:
-            sync();
-            break;
-    }
+    const choices = [
+        {
+            name: resources.sync,
+            value: EApplicationOptions.SYNC,
+        },
+        {
+            name: resources.import,
+            value: EApplicationOptions.IMPORT
+        },
+        {
+            name: resources.importweb,
+            value: EApplicationOptions.IMPORTWEB
+        },
+        new inquirer.Separator(),
+        {
+            name: resources.export,
+            value: EApplicationOptions.EXPORT
+        },
+    ];
+    console.log("csgo-sync");
+    // Prompt the user for the initial option
+    inquirer.prompt([{
+            type: "list", name: "option", message: "Please select an option", choices: choices
+        }]).then((answers) => {
+        switch (answers.option) {
+            case EApplicationOptions.EXPORT:
+                exportConfig();
+                break;
+            case EApplicationOptions.IMPORT:
+                importConfig();
+                break;
+            case EApplicationOptions.IMPORTWEB:
+                importConfigWeb();
+                break;
+            case EApplicationOptions.SYNC:
+                sync();
+                break;
+        }
+    });
 }
-const choices = [
-    {
-        name: resources.sync,
-        value: EApplicationOptions.SYNC,
-    },
-    {
-        name: resources.import,
-        value: EApplicationOptions.IMPORT
-    },
-    {
-        name: resources.importweb,
-        value: EApplicationOptions.IMPORTWEB
-    },
-    new inquirer.Separator(),
-    {
-        name: resources.export,
-        value: EApplicationOptions.EXPORT
-    },
-];
-console.log("csgo-sync");
-// Prompt the user for the initial option
-inquirer.prompt([{
-        type: "list", name: "option", message: "Please select an option", choices: choices
-    }]).then((answers) => {
-    main(answers.option);
-});
+exports.default = main;
