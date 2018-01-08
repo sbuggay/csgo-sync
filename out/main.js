@@ -4,22 +4,25 @@ const request = require("request");
 const fs = require("fs");
 const inquirer = require("inquirer");
 const path_1 = require("path");
+// TODO: turn these into command line arguments
 const APP_ID = 730;
 const API_KEY = "1578879989BD74A6D189050250810E86";
 const BIT_SHIFT = 61197960265728;
 const PLAYER_SUMMARIES_API_URL = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002";
+const OUT_FILE_NAME = "out.json";
 const resources = {
-    import: "import",
-    export: "export",
-    sync: "sync"
+    import: "Import from file",
+    importweb: "Import from URL",
+    export: "Export config",
+    sync: "Syncronize configs"
 };
-var applicationOptions;
-(function (applicationOptions) {
-    applicationOptions["IMPORT"] = "IMPORT";
-    applicationOptions["IMPORTWEB"] = "IMPORTWEB";
-    applicationOptions["EXPORT"] = "EXPORT";
-    applicationOptions["SYNC"] = "SYNC";
-})(applicationOptions || (applicationOptions = {}));
+var EApplicationOptions;
+(function (EApplicationOptions) {
+    EApplicationOptions["IMPORT"] = "IMPORT";
+    EApplicationOptions["IMPORTWEB"] = "IMPORTWEB";
+    EApplicationOptions["EXPORT"] = "EXPORT";
+    EApplicationOptions["SYNC"] = "SYNC";
+})(EApplicationOptions || (EApplicationOptions = {}));
 /**
  * Utility function to convert 32bit steamids to 64bit
  *
@@ -86,13 +89,6 @@ function getConfigFiles(path) {
 function getDirectories(path) {
     return fs.readdirSync(path).filter(name => isDirectory(path_1.join(userDataPath, name)));
 }
-function copyFile(source, destination) {
-    const readStream = fs.createReadStream(source);
-    const writeStream = fs.createWriteStream(destination);
-    if (readStream && writeStream) {
-        readStream.pipe(writeStream);
-    }
-}
 function importConfig(web = false) {
     inquirer.prompt([{
             type: "input",
@@ -112,16 +108,19 @@ function importConfig(web = false) {
  *
  */
 function exportConfig() {
-    const exportObject = {};
+    // Select config directory to export
     selectConfigDir("Which config would you like to export?").then(result => {
         const configPath = path_1.join(userDataPath, result, cfgRelativePath);
         const configFiles = getConfigFiles(configPath);
+        const exportObject = {};
+        // Read in config files
         configFiles.forEach(file => {
             const filename = path_1.basename(file);
             exportObject[filename] = fs.readFileSync(file, "utf8");
         });
         // Write serialized config file out
         fs.writeFileSync("out.json", JSON.stringify(exportObject));
+        console.log(`Config written to ${path_1.join(process.cwd, "out.json")}`);
     });
 }
 /**
@@ -130,21 +129,32 @@ function exportConfig() {
  */
 function sync() {
     selectConfigDir("Which config would you like to sync from?").then(result => {
-        confirm("Are you sure you want to sync?").then(answer => {
+        confirm("Are you sure you want to sync?").then(confirmation => {
             const configPath = path_1.join(userDataPath, result, cfgRelativePath);
             const configFiles = getConfigFiles(configPath);
             const files = {};
+            // Grab all the config files from the source directory
             configFiles.forEach(file => {
                 const filename = path_1.basename(file);
                 files[filename] = fs.readFileSync(file, "utf8");
             });
-            if (answer) {
-                let configDirs = getDirectories(userDataPath);
-                console.log(configDirs);
+            // Write this file to all other config directories
+            if (confirmation) {
+                getDirectories(userDataPath).forEach(value => {
+                    for (const file in files) {
+                        fs.writeFileSync(path_1.join(userDataPath, value, cfgRelativePath, file), files[file]);
+                    }
+                });
             }
         });
     });
 }
+/**
+ * Helper function to ask for confirmation
+ *
+ * @param {string} message
+ * @returns {Promise<boolean>}
+ */
 function confirm(message) {
     return new Promise((resolve, reject) => {
         inquirer.prompt({
@@ -156,25 +166,31 @@ function confirm(message) {
         });
     });
 }
+/**
+ * Helper function to ask user to select a config directory
+ *
+ * @param {string} message
+ * @returns {Promise<string>}
+ */
 function selectConfigDir(message) {
     return new Promise((resolve, reject) => {
+        // Get all the config directories
         let configDirs = getDirectories(userDataPath);
         const files = {};
         const playerSummaries = {};
+        // Get player summaries so we can show account name next to steamid
         getPlayerSummaries(configDirs).then(response => {
             response.forEach(summary => {
                 playerSummaries[summary.steamid] = summary;
             });
             const choices = [];
-            configDirs = configDirs.map(value => {
-                files[value] = getConfigFiles(path_1.join(userDataPath, value, cfgRelativePath)).map(name => path_1.join(userDataPath, value, cfgRelativePath));
+            configDirs.forEach(value => {
                 if (playerSummaries[convertTo64BitId(value)]) {
                     choices.push(`${value} [${playerSummaries[convertTo64BitId(value)].personaname}]`);
                 }
                 else {
                     choices.push(value);
                 }
-                return path_1.join(userDataPath, value, cfgRelativePath);
             });
             inquirer.prompt([{
                     type: "list",
@@ -190,32 +206,37 @@ function selectConfigDir(message) {
 }
 function main(option) {
     switch (option) {
-        case applicationOptions.EXPORT:
+        case EApplicationOptions.EXPORT:
             exportConfig();
             break;
-        case applicationOptions.IMPORT:
+        case EApplicationOptions.IMPORT:
             importConfig();
             break;
-        case applicationOptions.IMPORTWEB:
+        case EApplicationOptions.IMPORTWEB:
             importConfig(true);
             break;
-        case applicationOptions.SYNC:
+        case EApplicationOptions.SYNC:
             sync();
             break;
     }
 }
 const choices = [
     {
-        name: "sync",
-        value: applicationOptions.SYNC
+        name: resources.sync,
+        value: EApplicationOptions.SYNC,
     },
     {
-        name: "import",
-        value: applicationOptions.IMPORT
+        name: resources.import,
+        value: EApplicationOptions.IMPORT
     },
     {
-        name: "export",
-        value: applicationOptions.EXPORT
+        name: resources.importweb,
+        value: EApplicationOptions.IMPORTWEB
+    },
+    new inquirer.Separator(),
+    {
+        name: resources.export,
+        value: EApplicationOptions.EXPORT
     },
 ];
 inquirer.prompt([{
