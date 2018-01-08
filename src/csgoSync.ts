@@ -168,9 +168,9 @@ function writeConfig(configObject: IConfigObject) {
  * 
  * @param {string} message 
  * @param {Function} confirmedFunction
- * @returns {Promise<boolean>} 
+ * @returns {Promise<any>} 
  */
-function confirm(message: string, confirmedFunction?: Function): Promise<boolean> {
+function confirm(message: string, confirmedFunction?: Function): Promise<any> {
     return new Promise((resolve, reject) => {
         inquirer.prompt({ type: "confirm", name: "confirm", message }).then(answer => {
             if (answer) {
