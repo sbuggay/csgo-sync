@@ -22,6 +22,11 @@ interface IConfigObject {
     [key: string]: string;
 }
 
+/**
+ * Interface for csgo-sync command line configuration
+ * 
+ * @interface IApplicationConfiguration
+ */
 interface IApplicationConfiguration {
     outFile: string;
     appId: string;
@@ -31,8 +36,7 @@ interface IApplicationConfiguration {
     steamApiKey?: string;
 }
 
-// Default configuration values
-let appConfiguration: IApplicationConfiguration = {
+let appConfig: IApplicationConfiguration = {
     appId: "730",
     outFile: "config.json",
     userDataPath: "C:/Program Files (x86)/Steam/userdata",
@@ -41,6 +45,11 @@ let appConfiguration: IApplicationConfiguration = {
     steamApiKey: process.env.STEAM_API_KEY || null
 }
 
+/**
+ * Interface for user selected application options
+ * 
+ * @enum {number}
+ */
 enum EApplicationOptions {
     IMPORT = "IMPORT",
     IMPORTWEB = "IMPORTWEB",
@@ -94,8 +103,8 @@ function importConfigWeb(): Promise<any> {
 async function exportConfig(): Promise<any> {
     // Select config directory to export
     const result = await selectConfigDir("Which config would you like to export?")
-    const configPath = join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
-    const configFiles = getMatchingFiles(configPath, appConfiguration.supportedConfigFiles);
+    const configPath = join(appConfig.userDataPath, result, appConfig.appId, appConfig.cfgRelativePath);
+    const configFiles = getMatchingFiles(configPath, appConfig.supportedConfigFiles);
 
     const exportObject: IConfigObject = {};
 
@@ -106,9 +115,9 @@ async function exportConfig(): Promise<any> {
     });
 
     // Write serialized config file out
-    fs.writeFileSync(appConfiguration.outFile, JSON.stringify(exportObject, null, 4));
+    fs.writeFileSync(appConfig.outFile, JSON.stringify(exportObject, null, 4));
 
-    console.log(`Config written to ${appConfiguration.outFile}.`);
+    console.log(`Config written to ${appConfig.outFile}.`);
 }
 
 /**
@@ -120,8 +129,8 @@ async function syncConfig(): Promise<any> {
     // Select a config to syncronize from
     const result = await selectConfigDir("Which config would you like to sync from?");
     return confirm("Are you sure you want to sync?").then(() => {
-        const configPath = join(appConfiguration.userDataPath, result, appConfiguration.appId, appConfiguration.cfgRelativePath);
-        const configFiles = getMatchingFiles(configPath, appConfiguration.supportedConfigFiles);
+        const configPath = join(appConfig.userDataPath, result, appConfig.appId, appConfig.cfgRelativePath);
+        const configFiles = getMatchingFiles(configPath, appConfig.supportedConfigFiles);
 
         const configObject: IConfigObject = {};
 
@@ -145,9 +154,9 @@ async function syncConfig(): Promise<any> {
  */
 function writeConfig(configObject: IConfigObject) {
     // Write this file to all config directories
-    getDirectories(appConfiguration.userDataPath).forEach(value => {
+    getDirectories(appConfig.userDataPath).forEach(value => {
         for (const file in configObject) {
-            fs.writeFileSync(join(appConfiguration.userDataPath, value, appConfiguration.appId, appConfiguration.cfgRelativePath, file), configObject[file]);
+            fs.writeFileSync(join(appConfig.userDataPath, value, appConfig.appId, appConfig.cfgRelativePath, file), configObject[file]);
         }
     });
 
@@ -158,6 +167,7 @@ function writeConfig(configObject: IConfigObject) {
  * Helper function to ask for confirmation
  * 
  * @param {string} message 
+ * @param {Function} confirmedFunction
  * @returns {Promise<boolean>} 
  */
 function confirm(message: string, confirmedFunction?: Function): Promise<boolean> {
@@ -182,14 +192,14 @@ function confirm(message: string, confirmedFunction?: Function): Promise<boolean
  */
 async function selectConfigDir(message: string) {
     // Get all the config directories
-    let configDirs = getDirectories(appConfiguration.userDataPath);
+    let configDirs = getDirectories(appConfig.userDataPath);
 
     const files: any = {};
     const playerSummaries: any = {};
 
     // Get player summaries so we can show account name next to steamid
-    if (appConfiguration.steamApiKey) {
-        const response = await getPlayerSummaries(PLAYER_SUMMARIES_API_URL, appConfiguration.steamApiKey, configDirs) as any[];
+    if (appConfig.steamApiKey) {
+        const response = await getPlayerSummaries(PLAYER_SUMMARIES_API_URL, appConfig.steamApiKey, configDirs) as any[];
 
         response.forEach(summary => {
             playerSummaries[summary.steamid] = summary;
@@ -228,11 +238,11 @@ export default function () {
         .parse(process.argv);
 
     // TODO: Replace this with an extensible assign or something
-    appConfiguration.appId = program.appId || appConfiguration.appId;
-    appConfiguration.outFile = program.outFile || appConfiguration.outFile;
-    appConfiguration.userDataPath = program.userDataPath || appConfiguration.userDataPath;
-    appConfiguration.cfgRelativePath = program.cfgRelativePath || appConfiguration.cfgRelativePath;
-    appConfiguration.steamApiKey = program.steamApiKey || appConfiguration.steamApiKey;
+    appConfig.appId = program.appId || appConfig.appId;
+    appConfig.outFile = program.outFile || appConfig.outFile;
+    appConfig.userDataPath = program.userDataPath || appConfig.userDataPath;
+    appConfig.cfgRelativePath = program.cfgRelativePath || appConfig.cfgRelativePath;
+    appConfig.steamApiKey = program.steamApiKey || appConfig.steamApiKey;
 
     const choices: inquirer.ChoiceType[] = [{
         name: resources.sync,
